@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -263,6 +265,14 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 		if summaryMsgInex != -1 {
 			msgs = msgs[summaryMsgInex:]
 			msgs[0].Role = message.User
+		}
+	}
+
+	// On a fresh session, prepend an ephemeral recap of recent sessions so the
+	// model is aware of prior conversations without persisting this to the DB.
+	if len(msgs) == 0 {
+		if recap := a.buildSessionRecap(ctx, sessionID); recap != nil {
+			msgs = append(msgs, *recap)
 		}
 	}
 
@@ -755,4 +765,48 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error) 
 	}
 
 	return agentProvider, nil
+}
+
+const maxRecapSessions = 10
+
+func (a *agent) buildSessionRecap(ctx context.Context, currentSessionID string) *message.Message {
+	sessions, err := a.sessions.List(ctx)
+	if err != nil || len(sessions) == 0 {
+		return nil
+	}
+
+	var lines []string
+	count := 0
+	for _, s := range sessions {
+		if s.ID == currentSessionID || s.ParentSessionID != "" {
+			continue
+		}
+		if s.Title == "" || s.Title == "New Session" {
+			continue
+		}
+		t := time.Unix(s.CreatedAt, 0).UTC().Format("2006-01-02 15:04 UTC")
+		lines = append(lines, fmt.Sprintf("- %s (messages: %d, created: %s)", s.Title, s.MessageCount, t))
+		count++
+		if count >= maxRecapSessions {
+			break
+		}
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+
+	recap := fmt.Sprintf("[Session History — the user has had these recent conversations in this project. Use this context to avoid repeating questions or re-explaining things the user already discussed.]\n\n%s", strings.Join(lines, "\n"))
+	return &message.Message{
+		ID:        randomID(),
+		Role:      message.User,
+		SessionID: currentSessionID,
+		Parts:     []message.ContentPart{message.TextContent{Text: recap}},
+		CreatedAt: time.Now().Unix(),
+	}
+}
+
+func randomID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
