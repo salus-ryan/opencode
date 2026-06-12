@@ -188,13 +188,12 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 		}
 	}
 
-	return anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.providerOptions.model.APIModel),
-		MaxTokens:   a.providerOptions.maxTokens,
-		Temperature: temperature,
-		Messages:    messages,
-		Tools:       tools,
-		Thinking:    thinkingParam,
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.Model(a.providerOptions.model.APIModel),
+		MaxTokens: a.providerOptions.maxTokens,
+		Messages:  messages,
+		Tools:     tools,
+		Thinking:  thinkingParam,
 		System: []anthropic.TextBlockParam{
 			{
 				Text: a.providerOptions.systemMessage,
@@ -204,6 +203,14 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 			},
 		},
 	}
+
+	// `temperature` is deprecated for fable-class models and Anthropic
+	// rejects requests that include it (400 invalid_request_error).
+	if !strings.Contains(string(a.providerOptions.model.APIModel), "fable") {
+		params.Temperature = temperature
+	}
+
+	return params
 }
 
 func (a *anthropicClient) send(ctx context.Context, messages []message.Message, tools []toolsPkg.BaseTool) (resposne *ProviderResponse, err error) {
