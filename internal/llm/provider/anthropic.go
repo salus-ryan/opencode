@@ -42,7 +42,12 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
 		o(&anthropicOpts)
 	}
 
-	anthropicClientOptions := []option.RequestOption{}
+	anthropicClientOptions := []option.RequestOption{
+		// Explicit timeout: without this the SDK derives non-streaming timeouts
+		// from max_tokens (e.g. 2.25s for the 80-token title agent), which is
+		// too tight when routing through the local audit proxy.
+		option.WithRequestTimeout(5 * time.Minute),
+	}
 	if opts.apiKey != "" {
 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
 	}
