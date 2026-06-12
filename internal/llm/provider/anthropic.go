@@ -204,9 +204,10 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 		},
 	}
 
-	// `temperature` is deprecated for fable-class models and Anthropic
-	// rejects requests that include it (400 invalid_request_error).
-	if !strings.Contains(string(a.providerOptions.model.APIModel), "fable") {
+	// Some models (e.g. claude-fable-5) reject the temperature parameter
+	// with 400 invalid_request_error. Capability is declared in the model
+	// registry rather than inferred from the model name.
+	if !a.providerOptions.model.NoTemperature {
 		params.Temperature = temperature
 	}
 

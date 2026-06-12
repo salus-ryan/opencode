@@ -20,6 +20,9 @@ type Model struct {
 	DefaultMaxTokens    int64         `json:"default_max_tokens"`
 	CanReason           bool          `json:"can_reason"`
 	SupportsAttachments bool          `json:"supports_attachments"`
+	// NoTemperature marks models where the API rejects the temperature
+	// parameter (e.g. claude-fable-5 returns 400 if it is present).
+	NoTemperature bool `json:"no_temperature,omitempty"`
 }
 
 // Model IDs

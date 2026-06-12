@@ -122,5 +122,6 @@ var AnthropicModels = map[ModelID]Model{
 		DefaultMaxTokens:    50000,
 		CanReason:           true,
 		SupportsAttachments: true,
+		NoTemperature:       true,
 	},
 }
