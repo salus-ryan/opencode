@@ -271,7 +271,7 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 }
 
 func init() {
-	// Register the OpenCode theme with the theme manager
+	// Register the Fable theme (primary) and opencode as alias
+	RegisterTheme("fable", NewOpenCodeTheme())
 	RegisterTheme("opencode", NewOpenCodeTheme())
 }
-
