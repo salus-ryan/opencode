@@ -11,6 +11,7 @@ const (
 	Claude3Opus    ModelID = "claude-3-opus"
 	Claude4Opus    ModelID = "claude-4-opus"
 	Claude4Sonnet  ModelID = "claude-4-sonnet"
+	ClaudeFable5   ModelID = "claude-fable-5"
 )
 
 // https://docs.anthropic.com/en/docs/about-claude/models/all-models
@@ -106,6 +107,20 @@ var AnthropicModels = map[ModelID]Model{
 		CostPer1MOut:        75.0,
 		ContextWindow:       200000,
 		DefaultMaxTokens:    4096,
+		SupportsAttachments: true,
+	},
+	ClaudeFable5: {
+		ID:                  ClaudeFable5,
+		Name:                "Claude Fable 5",
+		Provider:            ProviderAnthropic,
+		APIModel:            "claude-fable-5",
+		CostPer1MIn:         10.0,
+		CostPer1MInCached:   12.50,
+		CostPer1MOutCached:  1.0,
+		CostPer1MOut:        50.0,
+		ContextWindow:       200000,
+		DefaultMaxTokens:    50000,
+		CanReason:           true,
 		SupportsAttachments: true,
 	},
 }

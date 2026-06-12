@@ -117,6 +117,13 @@ var defaultContextPaths = []string{
 	"OpenCode.local.md",
 	"OPENCODE.md",
 	"OPENCODE.local.md",
+	"fable.md",
+	"fable.local.md",
+	"Fable.md",
+	"Fable.local.md",
+	"FABLE.md",
+	"FABLE.local.md",
+	"prompts/system.md",
 }
 
 // Global configuration instance
@@ -230,7 +237,7 @@ func configureViper() {
 func setDefaults(debug bool) {
 	viper.SetDefault("data.directory", defaultDataDirectory)
 	viper.SetDefault("contextPaths", defaultContextPaths)
-	viper.SetDefault("tui.theme", "opencode")
+	viper.SetDefault("tui.theme", "fable")
 	viper.SetDefault("autoCompact", true)
 
 	// Set default shell from environment or fallback to /bin/bash
@@ -306,9 +313,9 @@ func setProviderDefaults() {
 
 	// Anthropic configuration
 	if key := viper.GetString("providers.anthropic.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.Claude4Sonnet)
-		viper.SetDefault("agents.summarizer.model", models.Claude4Sonnet)
-		viper.SetDefault("agents.task.model", models.Claude4Sonnet)
+		viper.SetDefault("agents.coder.model", models.ClaudeFable5)
+		viper.SetDefault("agents.summarizer.model", models.ClaudeFable5)
+		viper.SetDefault("agents.task.model", models.ClaudeFable5)
 		viper.SetDefault("agents.title.model", models.Claude4Sonnet)
 		return
 	}

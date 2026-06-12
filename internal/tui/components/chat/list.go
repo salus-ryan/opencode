@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -358,7 +359,7 @@ func (m *messagesCmp) working() string {
 		} else if hasUnfinishedToolCalls(m.messages) {
 			task = "Building tool call..."
 		} else if !lastMessage.IsFinished() {
-			task = "Generating..."
+			task = workingVerb()
 		}
 		if task != "" {
 			text += baseStyle.
@@ -369,6 +370,20 @@ func (m *messagesCmp) working() string {
 		}
 	}
 	return text
+}
+
+// fableVerbs are storyteller-flavored progress phrases, rotated while generating.
+var fableVerbs = []string{
+	"Weaving the next chapter...",
+	"Consulting the archives...",
+	"Turning pages...",
+	"Inking the draft...",
+	"Reading between the lines...",
+	"Plotting the arc...",
+}
+
+func workingVerb() string {
+	return fableVerbs[int(time.Now().Unix()/4)%len(fableVerbs)]
 }
 
 func (m *messagesCmp) help() string {

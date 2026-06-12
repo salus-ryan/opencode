@@ -84,7 +84,11 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 func (app *App) initTheme() {
 	cfg := config.Get()
 	if cfg == nil || cfg.TUI.Theme == "" {
-		return // Use default theme
+		// Default to the Fable signature theme
+		if err := theme.SetTheme("fable"); err != nil {
+			logging.Warn("Failed to set default fable theme", "error", err)
+		}
+		return
 	}
 
 	// Try to set the theme from config

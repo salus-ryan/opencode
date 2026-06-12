@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -44,6 +45,11 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
 	anthropicClientOptions := []option.RequestOption{}
 	if opts.apiKey != "" {
 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
+	}
+	// Route through a custom endpoint (e.g. Fable's local audit proxy) when set.
+	if baseURL := os.Getenv("ANTHROPIC_BASE_URL"); baseURL != "" {
+		anthropicClientOptions = append(anthropicClientOptions, option.WithBaseURL(baseURL))
+		logging.Info("anthropic: using custom base URL", "baseURL", baseURL)
 	}
 	if anthropicOpts.useBedrock {
 		anthropicClientOptions = append(anthropicClientOptions, bedrock.WithLoadDefaultConfig(context.Background()))

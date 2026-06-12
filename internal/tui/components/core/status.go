@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ type statusCmp struct {
 	messageTTL time.Duration
 	lspClients map[string]*lsp.Client
 	session    session.Session
+	audited    bool
 }
 
 // clearMessageCmd is a command that clears status messages after a timeout
@@ -143,7 +145,7 @@ func (m statusCmp) View() string {
 		Background(t.BackgroundDarker()).
 		Render(m.projectDiagnostics())
 
-	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth)
+	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-lipgloss.Width(m.auditShield())-tokenInfoWidth)
 
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
@@ -175,8 +177,26 @@ func (m statusCmp) View() string {
 	}
 
 	status += diagnostics
+	status += m.auditShield()
 	status += m.model()
 	return status
+}
+
+// auditShield renders a badge when API traffic is routed through the
+// local Fable audit proxy (SOC 2 hash-chained capture).
+func (m statusCmp) auditShield() string {
+	t := theme.CurrentTheme()
+	if !m.audited {
+		return styles.Padded().
+			Background(t.BackgroundDarker()).
+			Foreground(t.TextMuted()).
+			Render("⛨ unaudited")
+	}
+	return styles.Padded().
+		Background(t.BackgroundDarker()).
+		Foreground(t.Success()).
+		Bold(true).
+		Render("⛨ audited")
 }
 
 func (m *statusCmp) projectDiagnostics() string {
@@ -280,14 +300,19 @@ func (m statusCmp) model() string {
 	return styles.Padded().
 		Background(t.Secondary()).
 		Foreground(t.Background()).
-		Render(model.Name)
+		Bold(true).
+		Render(fmt.Sprintf("%s %s", styles.OpenCodeIcon, model.Name))
 }
 
 func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {
 	helpWidget = getHelpWidget()
 
+	baseURL := os.Getenv("ANTHROPIC_BASE_URL")
+	audited := strings.Contains(baseURL, "127.0.0.1") || strings.Contains(baseURL, "localhost")
+
 	return &statusCmp{
 		messageTTL: 10 * time.Second,
 		lspClients: lspClients,
+		audited:    audited,
 	}
 }

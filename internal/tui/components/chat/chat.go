@@ -28,10 +28,57 @@ type EditorFocusMsg bool
 func header(width int) string {
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
-		logo(width),
+		splash(width),
 		repo(width),
 		"",
 		cwd(width),
+	)
+}
+
+// fableArt is the block-letter splash logo shown on the empty session screen.
+var fableArt = []string{
+	"███████ █████╗ ██████╗ ██╗     ███████",
+	"██╔═════██╔══██╗██╔══██╗██║     ██╔════",
+	"█████╗  ███████║██████╔╝██║     █████╗",
+	"██╔══╝  ██╔══██║██╔══██╗██║     ██╔══╝",
+	"██║     ██║  ██║██████╔╝███████╗███████",
+	"╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════",
+}
+
+// splashGradient is the aurora gradient applied line-by-line to the splash.
+var splashGradient = []string{
+	"#c4a747", // aurora gold
+	"#c39a5e",
+	"#b98a8f",
+	"#a87fb8",
+	"#9d7bd8", // amethyst
+	"#7d6fd0",
+}
+
+func splash(width int) string {
+	artWidth := lipgloss.Width(fableArt[0])
+	if width < artWidth+2 {
+		return logo(width)
+	}
+
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
+
+	lines := make([]string, 0, len(fableArt)+2)
+	for i, line := range fableArt {
+		lines = append(lines, baseStyle.
+			Foreground(lipgloss.Color(splashGradient[i%len(splashGradient)])).
+			Render(line))
+	}
+
+	tagline := baseStyle.
+		Foreground(t.TextMuted()).
+		Italic(true).
+		Render("every commit tells a story — " + version.Version)
+	lines = append(lines, "", tagline)
+
+	return baseStyle.Width(width).Render(
+		lipgloss.JoinVertical(lipgloss.Left, lines...),
 	)
 }
 
