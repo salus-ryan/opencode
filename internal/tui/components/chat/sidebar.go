@@ -21,6 +21,7 @@ type sidebarCmp struct {
 	width, height int
 	session       session.Session
 	history       history.Service
+	filesCh       <-chan pubsub.Event[history.File]
 	modFiles      map[string]struct {
 		additions int
 		removals  int
@@ -30,8 +31,9 @@ type sidebarCmp struct {
 func (m *sidebarCmp) Init() tea.Cmd {
 	if m.history != nil {
 		ctx := context.Background()
-		// Subscribe to file events
-		filesCh := m.history.Subscribe(ctx)
+		// Subscribe once; the same channel is read for the lifetime of the
+		// component so no events are lost between reads.
+		m.filesCh = m.history.Subscribe(ctx)
 
 		// Initialize the modified files map
 		m.modFiles = make(map[string]struct {
@@ -42,12 +44,17 @@ func (m *sidebarCmp) Init() tea.Cmd {
 		// Load initial files and calculate diffs
 		m.loadModifiedFiles(ctx)
 
-		// Return a command that will send file events to the Update method
-		return func() tea.Msg {
-			return <-filesCh
-		}
+		return m.waitForFileEvent()
 	}
 	return nil
+}
+
+// waitForFileEvent blocks on the persistent subscription channel and
+// delivers the next file event to Update.
+func (m *sidebarCmp) waitForFileEvent() tea.Cmd {
+	return func() tea.Msg {
+		return <-m.filesCh
+	}
 }
 
 func (m *sidebarCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -69,14 +76,10 @@ func (m *sidebarCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Process the individual file change instead of reloading all files
 			ctx := context.Background()
 			m.processFileChanges(ctx, msg.Payload)
-
-			// Return a command to continue receiving events
-			return m, func() tea.Msg {
-				ctx := context.Background()
-				filesCh := m.history.Subscribe(ctx)
-				return <-filesCh
-			}
 		}
+		// Always keep listening, even for events from other sessions —
+		// otherwise the subscription loop dies on the first mismatch.
+		return m, m.waitForFileEvent()
 	}
 	return m, nil
 }
