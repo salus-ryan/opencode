@@ -435,7 +435,7 @@ func (c *copilotClient) stream(ctx context.Context, messages []message.Message, 
 				if c.isAnthropicModel() {
 					// Monkeypatch adapter for Sonnet-4 multi-tool use
 					for _, choice := range chunk.Choices {
-						if choice.Delta.ToolCalls != nil && len(choice.Delta.ToolCalls) > 0 {
+						if len(choice.Delta.ToolCalls) > 0 {
 							toolCall := choice.Delta.ToolCalls[0]
 							// Detect tool use start
 							if currentToolCallId == "" {
@@ -668,4 +668,3 @@ func WithCopilotBearerToken(bearerToken string) CopilotOption {
 		options.bearerToken = bearerToken
 	}
 }
-
