@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -228,8 +230,46 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		a.Publish(pubsub.CreatedEvent, result)
 		events <- result
 		close(events)
+		if result.Error == nil && result.Type == AgentEventTypeResponse {
+			a.maybeAutoCompact(context.Background(), sessionID)
+		}
 	}()
 	return events, nil
+}
+
+// maybeAutoCompact triggers summarization when the session's last-request
+// context size crosses a fraction of the model's context window. Compacting
+// rarely (high threshold) keeps prompt-cache reuse high while bounding
+// worst-case context growth.
+func (a *agent) maybeAutoCompact(ctx context.Context, sessionID string) {
+	if a.summarizeProvider == nil {
+		return
+	}
+	ratio := 0.80
+	if env := os.Getenv("OPENCODE_AUTOCOMPACT_RATIO"); env != "" {
+		if v, err := strconv.ParseFloat(env, 64); err == nil {
+			ratio = v
+		}
+	}
+	if ratio <= 0 { // disabled
+		return
+	}
+	window := a.provider.Model().ContextWindow
+	if window <= 0 {
+		return
+	}
+	session, err := a.sessions.Get(ctx, sessionID)
+	if err != nil {
+		return
+	}
+	used := session.PromptTokens + session.CompletionTokens
+	if float64(used) < float64(window)*ratio {
+		return
+	}
+	logging.InfoPersist(fmt.Sprintf("auto-compact: session %s at %d/%d tokens (>%.0f%%), summarizing", sessionID, used, window, ratio*100))
+	if err := a.Summarize(ctx, sessionID); err != nil {
+		logging.ErrorPersist(fmt.Sprintf("auto-compact failed: %v", err))
+	}
 }
 
 func (a *agent) processGeneration(ctx context.Context, sessionID, content string, attachmentParts []message.ContentPart) AgentEvent {
