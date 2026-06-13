@@ -31,6 +31,9 @@ type editorCmp struct {
 	textarea    textarea.Model
 	attachments []message.Attachment
 	deleteMode  bool
+	ghostSeq    int
+	ghostText   string
+	ghostFor    string
 }
 
 type EditorKeyMaps struct {
@@ -127,6 +130,8 @@ func (m *editorCmp) send() tea.Cmd {
 	value := m.textarea.Value()
 	m.textarea.Reset()
 	attachments := m.attachments
+	m.ghostText = ""
+	m.ghostFor = ""
 
 	m.attachments = nil
 	if value == "" {
@@ -162,7 +167,29 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		m.attachments = append(m.attachments, msg.Attachment)
+	case ghostTickMsg:
+		// Debounced: only the latest tick for the current input fires a fetch.
+		if msg.seq == m.ghostSeq && ghostEnabled() {
+			value := m.textarea.Value()
+			if len(value) >= ghostMinChars && !strings.Contains(value, "\n") {
+				return m, fetchGhost(value)
+			}
+		}
+		return m, nil
+	case ghostResultMsg:
+		// Stale results (input changed since request) are dropped.
+		if msg.input == m.textarea.Value() && msg.suggestion != "" {
+			m.ghostText = msg.suggestion
+			m.ghostFor = msg.input
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if msg.String() == "tab" && m.ghostText != "" && m.ghostFor == m.textarea.Value() && m.textarea.Focused() {
+			m.textarea.SetValue(m.textarea.Value() + m.ghostText)
+			m.ghostText = ""
+			m.ghostFor = ""
+			return m, nil
+		}
 		if key.Matches(msg, DeleteKeyMaps.AttachmentDeleteMode) {
 			m.deleteMode = true
 			return m, nil
@@ -212,7 +239,19 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	}
+	prevValue := m.textarea.Value()
 	m.textarea, cmd = m.textarea.Update(msg)
+	if newValue := m.textarea.Value(); newValue != prevValue {
+		// Input changed: invalidate ghost and schedule a new debounced fetch.
+		if m.ghostFor != newValue {
+			m.ghostText = ""
+			m.ghostFor = ""
+		}
+		if ghostEnabled() && len(newValue) >= ghostMinChars {
+			m.ghostSeq++
+			return m, tea.Batch(cmd, scheduleGhost(m.ghostSeq))
+		}
+	}
 	return m, cmd
 }
 
@@ -225,15 +264,50 @@ func (m *editorCmp) View() string {
 		Bold(true).
 		Foreground(t.Primary())
 
+	taView := m.textarea.View()
+	if m.ghostText != "" && m.ghostFor == m.textarea.Value() {
+		taView = m.renderWithGhost(taView)
+	}
+
 	if len(m.attachments) == 0 {
-		return lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+		return lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), taView)
 	}
 	m.textarea.SetHeight(m.height - 1)
 	return lipgloss.JoinVertical(lipgloss.Top,
 		m.attachmentsContent(),
 		lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"),
-			m.textarea.View()),
+			taView),
 	)
+}
+
+// renderWithGhost overlays the ghost suggestion in muted gray immediately
+// after the typed text on the textarea's first line.
+func (m *editorCmp) renderWithGhost(taView string) string {
+	t := theme.CurrentTheme()
+	value := m.textarea.Value()
+	lines := strings.Split(taView, "\n")
+	if len(lines) == 0 {
+		return taView
+	}
+	avail := m.textarea.Width() - lipgloss.Width(value) - 2
+	if avail <= 3 {
+		return taView
+	}
+	ghost := m.ghostText
+	if lipgloss.Width(ghost) > avail {
+		ghost = ghost[:avail-1] + "…"
+	}
+	ghostStyle := styles.BaseStyle().
+		Background(t.Background()).
+		Foreground(t.TextMuted()).
+		Italic(true)
+	idx := strings.LastIndex(lines[0], value)
+	if idx == -1 {
+		return taView
+	}
+	end := idx + len(value)
+	lines[0] = lines[0][:end] + ghostStyle.Render(ghost) + lines[0][end:]
+	return strings.Join(lines, "\n")
 }
 
 func (m *editorCmp) SetSize(width, height int) tea.Cmd {
